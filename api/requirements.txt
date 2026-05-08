@@ -1,0 +1,27 @@
+# Add dependencies as you build each component
+fastapi
+uvicorn[standard]
+pydantic-settings
+pydantic
+sqlalchemy
+aiosqlite
+pyjwt
+python-multipart
+httpx
+openai
+anthropicsdk
+google-generativeai
+langchain
+langchain-community
+langchain-openai
+langchain-chroma
+langgraph
+chromadb
+pymupdf
+beautifulsoup4
+requests
+rank-bm25
+sentence-transformers
+fastmcp
+pytest
+pytest-asyncio

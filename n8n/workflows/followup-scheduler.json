@@ -1,0 +1,1 @@
+{"name": "Follow-up Scheduler", "nodes": [], "connections": {}, "active": false, "settings": {}, "notes": "TODO: Build in n8n — daily cron → stale deals SQL → followup API → Gmail"}

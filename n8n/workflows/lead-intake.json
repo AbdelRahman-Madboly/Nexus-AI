@@ -1,0 +1,1 @@
+{"name": "Lead Intake", "nodes": [], "connections": {}, "active": false, "settings": {}, "notes": "TODO: Build in n8n — webhook trigger → classify API → Slack + OpenClaw Telegram"}

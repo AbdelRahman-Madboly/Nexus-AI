@@ -1,0 +1,1 @@
+{"name": "Pipeline Digest", "nodes": [], "connections": {}, "active": false, "settings": {}, "notes": "TODO: Build in n8n — Monday 8AM cron → GET pipeline report → email + Slack"}
