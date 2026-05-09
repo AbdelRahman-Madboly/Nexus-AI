@@ -1,0 +1,60 @@
+{
+  "_comment": [
+    "Nexus-AI MCP Server — Claude Desktop Configuration",
+    "",
+    "WHAT THIS FILE IS:",
+    "  This file tells Claude Desktop how to connect to the Nexus-AI MCP server.",
+    "  Copy the content of 'mcpServers' into your claude_desktop_config.json.",
+    "",
+    "WHERE YOUR CLAUDE DESKTOP CONFIG LIVES:",
+    "  Windows : %APPDATA%\\Claude\\claude_desktop_config.json",
+    "  Mac     : ~/Library/Application Support/Claude/claude_desktop_config.json",
+    "",
+    "HOW TO CONNECT:",
+    "  1. Start the Nexus-AI server first:",
+    "       cd C:\\Dan_WS\\Nexus-AI && source venv/bin/activate",
+    "       uvicorn api.main:app --host 0.0.0.0 --port 8000",
+    "  2. Open (or create) your claude_desktop_config.json",
+    "  3. Merge the 'mcpServers' block below into it",
+    "  4. Fully quit Claude Desktop (not just close the window) and relaunch",
+    "  5. Look for the hammer icon in Claude Desktop — that means MCP tools are active",
+    "",
+    "TROUBLESHOOTING:",
+    "  - 'Connection failed'   → Is uvicorn running? curl http://localhost:8000/api/health",
+    "  - 'No tools available'  → Did you fully restart Claude Desktop after editing config?",
+    "  - 'Timeout on kpis'     → Normal on Gemini free tier (cold start). Try nexus_pipeline_summary instead.",
+    "  - Config syntax error   → Validate with: python -m json.tool docs/mcp_config.json",
+    "",
+    "THE 10 AVAILABLE TOOLS:",
+    "  DATA / QUERY TOOLS (fast, DB-only, no LLM):",
+    "    nexus_query_leads        — List CRM leads, filter by stage",
+    "    nexus_query_deals        — List pipeline deals, filter by stage/owner",
+    "    nexus_get_deal_history   — Full deal + lead record by deal_id",
+    "    nexus_pipeline_summary   — Stage counts + total pipeline value (no LLM)",
+    "    nexus_agent_runs         — Recent LangGraph agent run logs",
+    "",
+    "  KNOWLEDGE TOOL (RAG — calls Ollama embed + LLM):",
+    "    nexus_search_knowledge   — Hybrid semantic+BM25 search over the knowledge base",
+    "",
+    "  ACTION TOOLS (write to DB or invoke LangGraph agents):",
+    "    nexus_update_deal_stage  — Move a deal to a new pipeline stage",
+    "    nexus_ingest_document    — Add a URL / file / text to the knowledge base",
+    "    nexus_schedule_followup  — Generate a follow-up email draft via LangGraph agent",
+    "    nexus_pipeline_kpis      — Full KPI report with LLM executive digest (5-15s)"
+  ],
+
+  "_usage": "Merge the 'mcpServers' object below into your claude_desktop_config.json",
+
+  "_config_location": {
+    "windows": "%APPDATA%\\Claude\\claude_desktop_config.json",
+    "mac":     "~/Library/Application Support/Claude/claude_desktop_config.json"
+  },
+
+  "mcpServers": {
+    "nexus-ai": {
+      "url":         "http://localhost:8000/mcp/sse",
+      "name":        "Nexus-AI",
+      "description": "AI-augmented business CRM — leads, deals, knowledge base, and pipeline agents"
+    }
+  }
+}

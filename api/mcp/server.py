@@ -351,3 +351,226 @@ async def nexus_agent_runs(
         }
         for row in rows
     ]
+
+# ===========================================================================
+# Phase 3, Day 10 — 4 Action Tools
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Tool 7: nexus_update_deal_stage
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def nexus_update_deal_stage(
+    deal_id: str,
+    new_stage: str,
+    owner: str = "",
+) -> dict:
+    """
+    Update the stage of a deal in the Nexus CRM pipeline.
+
+    Args:
+        deal_id: UUID of the deal to update.
+        new_stage: New stage to set. Valid values: new_lead, hot_lead,
+                   nurture, proposal, closed_won, closed_lost,
+                   disqualified, escalated.
+        owner: Optional — update the deal owner at the same time.
+
+    Returns:
+        Dict with keys:
+          - "success": True if updated, False if deal not found or invalid stage
+          - "deal_id": the deal_id that was updated
+          - "new_stage": the stage that was set
+          - "message": human-readable confirmation or error
+    """
+    from api.models.crm_models import LeadStage
+
+    # Validate stage against the enum
+    valid_stages = [s.value for s in LeadStage]
+    if new_stage not in valid_stages:
+        return {
+            "success":   False,
+            "deal_id":   deal_id,
+            "new_stage": new_stage,
+            "message":   f"Invalid stage: '{new_stage}'. Valid values: {', '.join(valid_stages)}",
+        }
+
+    async with get_db() as db:
+        # Verify deal exists
+        cursor = await db.execute(
+            "SELECT id FROM deals WHERE id = ?", (deal_id,)
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return {
+                "success":   False,
+                "deal_id":   deal_id,
+                "new_stage": new_stage,
+                "message":   "Deal not found",
+            }
+
+        # Build UPDATE — always set stage + updated_at, optionally owner
+        if owner:
+            await db.execute(
+                "UPDATE deals SET stage = ?, owner = ?, updated_at = datetime('now') WHERE id = ?",
+                (new_stage, owner, deal_id),
+            )
+        else:
+            await db.execute(
+                "UPDATE deals SET stage = ?, updated_at = datetime('now') WHERE id = ?",
+                (new_stage, deal_id),
+            )
+        await db.commit()
+
+    logger.info("nexus_update_deal_stage | deal_id=%s | new_stage=%s", deal_id, new_stage)
+    return {
+        "success":   True,
+        "deal_id":   deal_id,
+        "new_stage": new_stage,
+        "message":   "Deal updated successfully",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tool 8: nexus_ingest_document
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def nexus_ingest_document(
+    source: str,
+    doc_type: str = "auto",
+) -> dict:
+    """
+    Ingest a document into the Nexus knowledge base.
+
+    Supports URLs (http/https), file paths (.pdf, .docx, .md, .txt),
+    and raw text strings. After ingestion, the document is searchable
+    via nexus_search_knowledge.
+
+    Args:
+        source: URL, file path, or raw text to ingest.
+        doc_type: Document type hint. Options: url, pdf, docx, md, text, auto.
+                  Use "auto" to let Nexus detect the type automatically.
+
+    Returns:
+        Dict with keys:
+          - "source": the source that was ingested
+          - "doc_type": the detected or specified document type
+          - "chunk_count": number of chunks stored in ChromaDB
+          - "duration_ms": time taken in milliseconds
+          - "errors": list of any non-fatal errors encountered
+    """
+    try:
+        # Lazy import — avoids circular imports and heavy ML deps at startup
+        from api.rag.ingestor import ingest
+
+        # ingest() is async — it awaits embed calls and runs ChromaDB in executor internally
+        result = await ingest(source=source, doc_type=doc_type, metadata={})
+
+        return {
+            "source":      result.source,
+            "doc_type":    result.doc_type,
+            "chunk_count": result.chunk_count,
+            "duration_ms": result.duration_ms,
+            "errors":      result.errors,
+        }
+    except Exception as exc:
+        logger.error("nexus_ingest_document failed: %s", exc)
+        return {
+            "source":      source,
+            "doc_type":    doc_type,
+            "chunk_count": 0,
+            "duration_ms": 0,
+            "errors":      [str(exc)],
+        }
+
+
+# ---------------------------------------------------------------------------
+# Tool 9: nexus_schedule_followup
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def nexus_schedule_followup(deal_id: str) -> dict:
+    """
+    Generate a personalised follow-up email draft for a deal using the
+    Nexus Follow-up Writer LangGraph agent.
+
+    The agent loads the deal history, retrieves relevant product context
+    from the knowledge base, drafts an email, and self-reviews it
+    (retrying up to 2 times if quality score is below 70).
+
+    Args:
+        deal_id: UUID of the deal to write a follow-up for.
+
+    Returns:
+        Dict with keys:
+          - "draft": the email body ready to send
+          - "review_score": quality score 0-100 from the self-review node
+          - "run_id": the agent run UUID (use with nexus_agent_runs to inspect the trace)
+          - "error": present only if the agent failed (e.g. deal not found)
+    """
+    try:
+        # Lazy import — prevents circular imports at module load time
+        from api.agents.followup_agent import write_followup
+
+        result = await write_followup(deal_id=deal_id)
+        return {
+            "draft":        result["draft"],
+            "review_score": result["review_score"],
+            "run_id":       result["run_id"],
+        }
+    except ValueError as exc:
+        # Deal not found — expected error, return gracefully
+        logger.warning("nexus_schedule_followup | deal not found: %s", exc)
+        return {
+            "draft":        "",
+            "review_score": 0,
+            "run_id":       "",
+            "error":        str(exc),
+        }
+    except Exception as exc:
+        logger.error("nexus_schedule_followup failed: %s", exc)
+        return {
+            "draft":        "",
+            "review_score": 0,
+            "run_id":       "",
+            "error":        f"Agent failed: {str(exc)}",
+        }
+
+
+# ---------------------------------------------------------------------------
+# Tool 10: nexus_pipeline_kpis
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def nexus_pipeline_kpis() -> dict:
+    """
+    Run the Nexus Pipeline Reporter agent to generate a full KPI report.
+
+    This triggers the full 5-node LangGraph pipeline:
+    SQL queries → KPI computation → bottleneck detection → LLM executive digest.
+
+    Takes 5-15 seconds depending on LLM backend (Gemini free tier: ~8s).
+    For a faster snapshot without LLM, use nexus_pipeline_summary instead.
+
+    Returns:
+        Dict with keys:
+          - "kpis": {conversion_rate, avg_deal_age, stage_distribution, total_pipeline_value}
+          - "bottlenecks": list of identified bottleneck strings
+          - "digest": LLM-written 3-paragraph executive summary
+          - "run_id": the agent run UUID
+    """
+    try:
+        # Lazy import — prevents circular imports and agent/LangGraph startup cost at import time
+        from api.agents.reporter_agent import generate_report
+
+        result = await generate_report()
+        return result
+    except Exception as exc:
+        logger.error("nexus_pipeline_kpis failed: %s", exc)
+        return {
+            "kpis":        {},
+            "bottlenecks": [],
+            "digest":      f"Report failed: {str(exc)}",
+            "run_id":      "",
+        }
