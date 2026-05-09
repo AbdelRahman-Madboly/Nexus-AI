@@ -1,27 +1,34 @@
-# Add dependencies as you build each component
-fastapi
-uvicorn[standard]
-pydantic-settings
-pydantic
-sqlalchemy
-aiosqlite
-pyjwt
-python-multipart
-httpx
-openai
-anthropicsdk
-google-generativeai
-langchain
-langchain-community
-langchain-openai
-langchain-chroma
-langgraph
-chromadb
-pymupdf
-beautifulsoup4
-requests
-rank-bm25
-sentence-transformers
-fastmcp
-pytest
-pytest-asyncio
+# Nexus-AI — api/requirements.txt
+# Phase 0 packages only — keeps the Docker image lean and fast to build.
+# Heavy ML packages (sentence-transformers, torch, chromadb) are added in Phase 1.
+
+# ── Web Framework ────────────────────────────────────────────────────────────
+fastapi==0.136.1
+uvicorn[standard]==0.46.0
+python-multipart==0.0.27
+starlette==1.0.0
+
+# ── Settings & Validation ────────────────────────────────────────────────────
+pydantic==2.13.4
+pydantic-settings==2.14.1
+pydantic-core==2.46.4
+python-dotenv==1.2.2
+
+# ── Database ─────────────────────────────────────────────────────────────────
+aiosqlite==0.22.1
+
+# ── HTTP Client ──────────────────────────────────────────────────────────────
+httpx==0.28.1
+
+# ── LLM SDKs ────────────────────────────────────────────────────────────────
+openai==2.36.0
+anthropic==0.100.0
+google-genai==2.0.0
+
+# ── Testing ──────────────────────────────────────────────────────────────────
+pytest==9.0.3
+pytest-asyncio==1.3.0
+
+# ── Phase 1+ packages added here when we reach those days ──────────────────
+# langchain, langchain-community, chromadb, sentence-transformers,
+# langgraph, langchain-core, fastmcp

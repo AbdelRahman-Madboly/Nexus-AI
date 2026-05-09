@@ -2,22 +2,29 @@ version: "3.9"
 
 services:
 
-  # ── FastAPI Backend ──────────────────────────────────────────────
   nexus-api:
-    build: ./api
+    build:
+      context: ./api
+      dockerfile: Dockerfile
     container_name: nexus-api
     ports:
       - "8000:8000"
     env_file: .env
+    environment:
+      - OLLAMA_BASE_URL=http://nexus-ollama:11434
+      - CHROMA_HOST=nexus-chroma
+      - CHROMA_PORT=8001
+      - OPENCLAW_NEXUS_API_URL=http://nexus-api:8000
+      - DATABASE_URL=sqlite:///./nexus.db
     volumes:
-      - ./api:/app
       - ./nexus.db:/app/nexus.db
     depends_on:
       - nexus-chroma
       - nexus-ollama
     restart: unless-stopped
+    networks:
+      - nexus-network
 
-  # ── ChromaDB Vector Store ────────────────────────────────────────
   nexus-chroma:
     image: chromadb/chroma:latest
     container_name: nexus-chroma
@@ -26,8 +33,9 @@ services:
     volumes:
       - chroma_data:/chroma/chroma
     restart: unless-stopped
+    networks:
+      - nexus-network
 
-  # ── Ollama Local LLM ─────────────────────────────────────────────
   nexus-ollama:
     image: ollama/ollama:latest
     container_name: nexus-ollama
@@ -35,51 +43,69 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    # GPU passthrough disabled — requires NVIDIA Container Toolkit in WSL.
+    # nexus-api uses your Windows Ollama (RTX 4050) via OLLAMA_BASE_URL in .env.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
     restart: unless-stopped
+    networks:
+      - nexus-network
 
-  # ── n8n Automation ───────────────────────────────────────────────
   nexus-n8n:
     image: n8nio/n8n:latest
     container_name: nexus-n8n
     ports:
       - "5678:5678"
     env_file: .env
+    environment:
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n/workflows:/workflows
     restart: unless-stopped
+    networks:
+      - nexus-network
 
-  # ── React Dashboard ──────────────────────────────────────────────
   nexus-ui:
-    build: ./dashboard
+    image: node:22-alpine
     container_name: nexus-ui
+    working_dir: /app
+    command: sh -c "echo 'Nexus UI placeholder' && tail -f /dev/null"
     ports:
       - "3000:3000"
-    env_file: .env
     depends_on:
       - nexus-api
     restart: unless-stopped
+    networks:
+      - nexus-network
 
-  # ── OpenClaw Gateway ─────────────────────────────────────────────
-  # Messaging AI agent: Telegram / WhatsApp / Slack
   nexus-openclaw:
-    image: node:24-alpine
+    image: node:22-alpine
     container_name: nexus-openclaw
     working_dir: /app
-    command: sh -c "npm install -g openclaw && openclaw start"
+    command: sh -c "echo 'Nexus OpenClaw placeholder' && tail -f /dev/null"
     ports:
       - "3456:3456"
-    env_file: openclaw/.env
-    volumes:
-      - ./openclaw:/app/openclaw-config
-      - openclaw_data:/root/.openclaw
     depends_on:
       - nexus-api
       - nexus-ollama
     restart: unless-stopped
+    networks:
+      - nexus-network
 
 volumes:
   chroma_data:
   ollama_data:
   n8n_data:
-  openclaw_data:
+
+networks:
+  nexus-network:
+    driver: bridge
