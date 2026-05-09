@@ -3,15 +3,13 @@ api/routers/agent_router.py
 ===========================
 LangGraph agent router for Nexus-AI.
 
-Day 6 update:
-  - POST /api/agents/lead/classify  → LIVE (Lead Classifier Agent)
-  - GET  /api/agents/trace/{run_id} → LIVE (query agent_runs table)
+Day 6: POST /api/agents/lead/classify  → LIVE (Lead Classifier Agent)
+       GET  /api/agents/trace/{run_id} → LIVE (query agent_runs table)
 
-Day 7 update:
-  - POST /api/agents/lead/followup  → LIVE (Follow-up Writer Agent)
+Day 7: POST /api/agents/lead/followup  → LIVE (Follow-up Writer Agent)
 
-Still 501 (implemented in Day 8):
-  - GET /api/agents/pipeline/report → Phase 2, Day 8
+Day 8: GET  /api/agents/pipeline/report → LIVE (Pipeline Reporter Agent)
+       tests/test_agents.py             → 7 tests, all passing
 """
 
 import logging
@@ -22,6 +20,7 @@ from pydantic import BaseModel
 
 from api.agents.lead_agent import classify_lead
 from api.agents.followup_agent import write_followup
+from api.agents.reporter_agent import generate_report
 from api.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -177,7 +176,7 @@ async def draft_followup(body: FollowupRequest) -> FollowupResponse:
       3. draft_email              — personalised email (< 200 words, clear CTA)
       4. self_review              — scores draft 0–100, writes improvement notes
       5. route_by_confidence      — if score < 70 AND retries < 2 → loop to draft_email
-                                     else → END
+                                    else → END
 
     Full run is logged to agent_runs and retrievable via GET /trace/{run_id}.
 
@@ -203,22 +202,45 @@ async def draft_followup(body: FollowupRequest) -> FollowupResponse:
 
 
 # ---------------------------------------------------------------------------
-# GET /api/agents/pipeline/report — 501 until Day 8
+# GET /api/agents/pipeline/report — LIVE (Day 8)
 # ---------------------------------------------------------------------------
 
 @router.get(
     "/pipeline/report",
-    response_model=MessageResponse,
-    status_code=501,
+    response_model=ReportResponse,
+    status_code=200,
     summary="Generate a pipeline KPI report via LangGraph agent",
-    description="Phase 2, Day 8 — not yet implemented.",
+    description=(
+        "Runs the Pipeline Reporter Agent (5-node LangGraph StateGraph). "
+        "Queries all CRM data from SQLite, computes 4 KPI sections "
+        "(conversion_rate, avg_deal_age, stage_distribution, total_pipeline_value), "
+        "identifies bottlenecks via rule-based logic, and generates a 3-paragraph "
+        "executive digest via LLM. Full run logged to agent_runs."
+    ),
 )
-async def pipeline_report() -> JSONResponse:
+async def pipeline_report() -> ReportResponse:
     """
-    Will run the Pipeline Reporter Agent (4 KPI sections + bottleneck analysis).
-    Built in Phase 2, Day 8.
+    Runs the Pipeline Reporter Agent through its 5-node pipeline:
+
+      1. query_pipeline_data  — 4 SQL queries: stage counts, deal age, value, agent activity
+      2. compute_kpis         — derives conversion_rate, avg_deal_age, stage_distribution,
+                                total_pipeline_value from raw query data
+      3. identify_bottlenecks — applies 4 rules to flag pipeline problems
+      4. generate_digest      — LLM writes 3-paragraph executive summary with exact KPI values
+      5. route_to_output      — pass-through, reserved for Phase 5 Slack/email delivery
+
+    Returns:
+      kpis:        dict with 4 KPI keys
+      bottlenecks: list of bottleneck strings (empty list if pipeline is healthy)
+      digest:      3-paragraph written summary
+      run_id:      UUID for GET /trace/{run_id}
     """
-    return JSONResponse(
-        status_code=501,
-        content={"detail": "Pipeline Reporter Agent not yet implemented"},
-    )
+    try:
+        result = await generate_report()
+        return ReportResponse(**result)
+    except Exception as exc:
+        logger.exception("pipeline_report error: %s", exc)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Pipeline report generation failed: {str(exc)}"},
+        )
