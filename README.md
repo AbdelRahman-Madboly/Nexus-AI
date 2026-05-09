@@ -14,9 +14,9 @@ Nexus is a self-hosted platform that connects AI to the full lifecycle of a B2B 
 | Component | What it does |
 |---|---|
 | **RAG Engine** | Ingest any document (PDF, URL, DOCX, Markdown). Ask business questions and get cited, grounded answers. |
-| **Lead Classifier Agent** | Drop in a lead and get a classification (hot/nurture/disqualified), a score, and the reasoning — in under 3 seconds. |
-| **Follow-up Writer Agent** | Give it a deal ID and get a personalized follow-up email that references facts from the deal history. Self-reviews its own draft. |
-| **Pipeline Reporter Agent** | Ask for a pipeline report and get conversion rate, average deal age, stage distribution, and bottleneck analysis. |
+| **Lead Classifier Agent** | Drop in a lead and get a classification (hot/nurture/disqualified/escalated), a score, and the reasoning — in under 3 seconds. |
+| **Follow-up Writer Agent** | Give it a deal ID and get a personalized follow-up email that references facts from the deal history. Self-reviews its own draft and retries if quality is below threshold. |
+| **Pipeline Reporter Agent** | Ask for a pipeline report and get conversion rate, average deal age, stage distribution, and bottleneck analysis — plus an LLM-written executive digest. |
 | **OpenClaw Gateway** | Send "classify this lead" via Telegram or WhatsApp. The AI agent classifies it and replies — no dashboard needed. |
 | **MCP Server** | Open Claude Desktop and ask "How many hot leads do we have?" — it queries your live SQLite database and answers. |
 | **n8n Workflows** | 4 business automations: lead intake, stale-deal follow-up, Monday pipeline digest, and alert escalation. |
@@ -76,9 +76,9 @@ FastAPI Gateway (port 8000)
 │   ├── Document Ingestor  — PDF/MD/DOCX/URL → chunk → embed → ChromaDB
 │   └── Hybrid Retriever   — semantic + BM25 → cross-encoder rerank → LLM → stream
 ├── LangGraph Agents (SQLite checkpointer)
-│   ├── Lead Classifier    — 5 nodes, deterministic score-based routing
-│   ├── Follow-up Writer   — 5 nodes, self-review loop (max 2 retries)
-│   └── Pipeline Reporter  — 5 nodes, 4 KPI sections
+│   ├── Lead Classifier    — 5 nodes, score-based routing (hot/nurture/disqualified/escalated)
+│   ├── Follow-up Writer   — 5 nodes, self-review loop (max 2 retries, threshold 70)
+│   └── Pipeline Reporter  — 5 nodes, 4 KPI sections, rule-based bottleneck detection
 ├── MCP Server (FastMCP)   — 10 tools, Claude Desktop integration
 ├── OpenClaw Gateway (port 3456)
 │   └── Skills: nexus-rag · nexus-leads · nexus-pipeline
@@ -127,11 +127,11 @@ OPENAI_API_KEY=sk-...
 
 # Use local Ollama only (privacy mode)
 LLM_BACKEND=ollama
-PRIVACY_MODE=true              # ← this forces ALL calls to Ollama regardless of LLM_BACKEND
+PRIVACY_MODE=true              # ← forces ALL calls to Ollama regardless of LLM_BACKEND
 ```
 
 Embeddings always use Ollama (`nomic-embed-text`) regardless of backend.
-This ensures ChromaDB vectors stay consistent.
+This ensures ChromaDB vectors stay consistent across ingest and query.
 
 ---
 
@@ -165,9 +165,20 @@ POST /api/agents/lead/classify
 }
 ```
 
+### Generate a follow-up email
+```bash
+POST /api/agents/lead/followup
+{"deal_id": "your-deal-uuid"}
+```
+
 ### Get pipeline report
 ```bash
 GET /api/agents/pipeline/report
+```
+
+### Get agent trace
+```bash
+GET /api/agents/trace/{run_id}
 ```
 
 ---
@@ -176,7 +187,7 @@ GET /api/agents/pipeline/report
 
 1. **Start:** `docker-compose up -d` → confirm all 6 services running
 2. **RAG:** Ingest Projecx website → ask "What is Revenyu?" → get cited answer
-3. **Agents:** POST test lead → watch classification → check trace in dashboard
+3. **Agents:** POST test lead → watch classification + score → check trace in dashboard
 4. **Messaging:** Send "Classify this lead: [Acme Corp, CEO, wants AI CRM]" via Telegram → response arrives
 5. **MCP:** Open Claude Desktop → "How many hot leads?" → live answer from SQLite
 6. **Automation:** Trigger Lead Intake webhook in n8n → Slack message + Telegram notification appear
@@ -193,13 +204,13 @@ Nexus-AI/
 │   ├── main.py             # FastAPI app + health endpoint
 │   ├── llm/                # LLM router + 4 backend clients
 │   ├── rag/                # Document ingestor + hybrid retriever
-│   ├── agents/             # 3 LangGraph agents
+│   ├── agents/             # 3 LangGraph agents + shared graph utils
 │   ├── mcp/                # FastMCP server, 10 tools
 │   └── routers/            # API route handlers
 ├── openclaw/               # OpenClaw gateway config + skills
 ├── n8n/workflows/          # 4 n8n workflow JSON files
 ├── dashboard/              # React + Vite + TailwindCSS
-├── tests/                  # pytest test suites
+├── tests/                  # pytest test suites (35/35 passing)
 ├── docs/                   # Architecture + API contract + demo script
 └── docker-compose.yml      # 6 services
 ```
@@ -218,13 +229,25 @@ OpenClaw · n8n · FastMCP · React · Vite · TypeScript · TailwindCSS · Dock
 | Phase | Status | Description |
 |---|---|---|
 | Phase 0 — Foundation | ✅ v0.1.0 | Config, DB, LLM router, FastAPI, Docker |
-| Phase 1 — RAG Engine | 🔄 In progress | Document ingestor + hybrid retriever |
-| Phase 2 — Agents | ⬜ | Lead Classifier + Follow-up Writer + Reporter |
-| Phase 3 — MCP Server | ⬜ | FastMCP, 10 tools, Claude Desktop |
-| Phase 4 — OpenClaw | ⬜ | Messaging gateway, 3 skills, Telegram |
-| Phase 5 — n8n | ⬜ | 4 business automation workflows |
-| Phase 6 — Dashboard | ⬜ | React dashboard, 3 pages |
-| Phase 7 — Integration | ⬜ | Full demo, LinkedIn post, submit |
+| Phase 1 — RAG Engine | ✅ v0.2.0 | Document ingestor + hybrid retriever (semantic + BM25 + rerank) |
+| Phase 2 — Agents | ✅ v0.3.0 | Lead Classifier + Follow-up Writer + Pipeline Reporter |
+| Phase 3 — MCP Server | ⬜ v0.4.0 | FastMCP, 10 tools, Claude Desktop |
+| Phase 4 — OpenClaw | ⬜ v0.5.0 | Messaging gateway, 3 skills, Telegram |
+| Phase 5 — n8n | ⬜ v0.6.0 | 4 business automation workflows |
+| Phase 6 — Dashboard | ⬜ v0.7.0 | React dashboard, 3 pages |
+| Phase 7 — Integration | ⬜ v1.0.0 | Full demo, LinkedIn post, submit |
+
+---
+
+## Test Coverage
+
+| Suite | Tests | Status |
+|---|---|---|
+| `tests/test_database.py` | 18 | ✅ Passing |
+| `tests/test_rag.py` | 10 | ✅ Passing |
+| `tests/test_agents.py` | 7 | ✅ Passing |
+
+All agent tests are fully mocked — no Ollama, Gemini, or ChromaDB required to run the suite.
 
 ---
 
