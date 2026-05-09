@@ -7,9 +7,11 @@ Day 6 update:
   - POST /api/agents/lead/classify  → LIVE (Lead Classifier Agent)
   - GET  /api/agents/trace/{run_id} → LIVE (query agent_runs table)
 
-Still 501 (implemented in later days):
-  - POST /api/agents/lead/followup   → Phase 2, Day 7
-  - GET  /api/agents/pipeline/report → Phase 2, Day 8
+Day 7 update:
+  - POST /api/agents/lead/followup  → LIVE (Follow-up Writer Agent)
+
+Still 501 (implemented in Day 8):
+  - GET /api/agents/pipeline/report → Phase 2, Day 8
 """
 
 import logging
@@ -19,6 +21,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from api.agents.lead_agent import classify_lead
+from api.agents.followup_agent import write_followup
 from api.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -67,7 +70,7 @@ class MessageResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# POST /api/agents/lead/classify — LIVE
+# POST /api/agents/lead/classify — LIVE (Day 6)
 # ---------------------------------------------------------------------------
 
 @router.post(
@@ -107,7 +110,7 @@ async def classify_lead_endpoint(body: LeadClassifyRequest) -> LeadClassifyRespo
 
 
 # ---------------------------------------------------------------------------
-# GET /api/agents/trace/{run_id} — LIVE
+# GET /api/agents/trace/{run_id} — LIVE (Day 6)
 # ---------------------------------------------------------------------------
 
 @router.get(
@@ -150,25 +153,53 @@ async def get_trace(run_id: str):
 
 
 # ---------------------------------------------------------------------------
-# POST /api/agents/lead/followup — 501 until Day 7
+# POST /api/agents/lead/followup — LIVE (Day 7)
 # ---------------------------------------------------------------------------
 
 @router.post(
     "/lead/followup",
-    response_model=MessageResponse,
-    status_code=501,
+    response_model=FollowupResponse,
+    status_code=200,
     summary="Draft a follow-up email via LangGraph agent",
-    description="Phase 2, Day 7 — not yet implemented.",
+    description=(
+        "Runs the Follow-up Writer Agent (5-node LangGraph StateGraph with self-review loop). "
+        "Loads deal + lead from SQLite, retrieves RAG context, drafts an email, "
+        "self-reviews it (score 0–100), and retries up to 2 times if score < 70. "
+        "Returns the final draft, its review score, and a run_id for tracing."
+    ),
 )
-async def draft_followup(body: FollowupRequest) -> JSONResponse:
+async def draft_followup(body: FollowupRequest) -> FollowupResponse:
     """
-    Will run the Follow-up Writer Agent (5 nodes + self-review loop, max 2 retries).
-    Returns draft, review_score, and run_id.  Built in Phase 2, Day 7.
+    Accepts a deal_id, runs it through the Follow-up Writer pipeline:
+
+      1. load_deal_history        — JOIN deals + leads from SQLite
+      2. retrieve_product_context — RAG chunks for deal context
+      3. draft_email              — personalised email (< 200 words, clear CTA)
+      4. self_review              — scores draft 0–100, writes improvement notes
+      5. route_by_confidence      — if score < 70 AND retries < 2 → loop to draft_email
+                                     else → END
+
+    Full run is logged to agent_runs and retrievable via GET /trace/{run_id}.
+
+    Returns 404 if deal_id is not found.
+    Returns 500 on unexpected agent failure.
     """
-    return JSONResponse(
-        status_code=501,
-        content={"detail": "Follow-up Writer Agent not yet implemented"},
-    )
+    try:
+        result = await write_followup(deal_id=body.deal_id)
+        return FollowupResponse(**result)
+    except ValueError as exc:
+        # deal_id not found in SQLite — propagated from load_deal_history
+        logger.warning("draft_followup: deal not found | deal_id=%s | %s", body.deal_id, exc)
+        return JSONResponse(
+            status_code=404,
+            content={"detail": str(exc)},
+        )
+    except Exception as exc:
+        logger.exception("draft_followup error: %s", exc)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Follow-up generation failed: {str(exc)}"},
+        )
 
 
 # ---------------------------------------------------------------------------
