@@ -83,9 +83,11 @@
 │   └── test_rag.py
 ├── .env.example
 ├── .gitignore
+├── FileTree-Nexus-AI.md
 ├── LICENSE
 ├── README.md
-└── docker-compose.yml
+├── docker-compose.yml
+└── nexus.db
 ```
 
 ---
