@@ -8,19 +8,16 @@ Phase 1 Day 5: /query endpoint implemented (retriever).
 
 Endpoints:
   POST /api/rag/ingest  → ingest document into ChromaDB
-  POST /api/rag/query   → 501 until Day 5
+  POST /api/rag/query   → hybrid search + rerank + LLM answer
 """
-
-import uuid
-from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from api.database import get_db
-from api.models.crm_models import RagQueryCreate
 from api.rag.ingestor import ingest
+from api.rag.retriever import QueryResult
+from api.rag.retriever import query as rag_query
 
 router = APIRouter(prefix="/api/rag", tags=["RAG"])
 
@@ -45,7 +42,7 @@ class IngestResponse(BaseModel):
 class QueryRequest(BaseModel):
     query:  str
     top_k:  int  = 3
-    stream: bool = False
+    stream: bool = False   # kept for future streaming support
 
 
 class MessageResponse(BaseModel):
@@ -94,22 +91,33 @@ async def ingest_document(body: IngestRequest) -> IngestResponse:
 
 
 # ---------------------------------------------------------------------------
-# POST /api/rag/query  — 501 until Day 5
+# POST /api/rag/query
 # ---------------------------------------------------------------------------
 
 @router.post(
     "/query",
-    response_model=MessageResponse,
-    status_code=501,
+    response_model=QueryResult,
+    status_code=200,
     summary="Query the RAG knowledge base",
-    description="Phase 1 Day 5 — not yet implemented.",
+    description="Hybrid semantic + BM25 retrieval, cross-encoder reranking, LLM answer with citations.",
 )
-async def query_knowledge_base(body: QueryRequest) -> JSONResponse:
+async def query_knowledge_base(body: QueryRequest) -> QueryResult:
     """
-    Hybrid semantic + BM25 retrieval with reranking and LLM answer generation.
-    Built in Phase 1, Day 5.
+    Full RAG pipeline:
+      1. Embed query → semantic search (ChromaDB)
+      2. BM25 keyword search over corpus
+      3. Hybrid merge + cross-encoder rerank
+      4. Build context → LLM answer (via llm_router — respects PRIVACY_MODE)
+      5. Log to rag_queries table
+      6. Return answer + sources + latency_ms
     """
-    return JSONResponse(
-        status_code=501,
-        content={"detail": "RAG retriever not yet implemented — coming Day 5"},
-    )
+    try:
+        result = await rag_query(
+            q=body.query,
+            top_k=body.top_k,
+            stream=body.stream,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Query failed: {exc}")
+
+    return result
