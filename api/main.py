@@ -8,7 +8,14 @@ Responsibilities:
   - Call init_db() exactly once at startup
   - Register CORS middleware (dev mode — all origins)
   - Mount all 3 routers (rag, agents, mcp)
+  - Mount FastMCP SSE transport at /mcp for Claude Desktop
   - Expose GET /api/health with real component status checks
+
+Phase history:
+  v0.1.0 — Phase 0: foundation, LLM router, health endpoint
+  v0.2.0 — Phase 1: RAG engine wired (rag_router live)
+  v0.3.0 — Phase 2: LangGraph agents wired (agent_router live)
+  v0.3.0 — Phase 3: MCP server mounted (mcp_router live + /mcp SSE)
 
 Rules enforced:
   - All settings from api/config.py — zero hardcoded values
@@ -28,6 +35,7 @@ from api.config import get_settings
 from api.database import init_db
 from api.models.crm_models import HealthComponent, HealthResponse
 from api.routers import agent_router, mcp_router, rag_router
+from api.mcp.server import mcp   # FastMCP singleton — tools registered at import time
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -65,7 +73,7 @@ settings = get_settings()
 
 app = FastAPI(
     title="Nexus-AI",
-    version="0.1.0",
+    version="0.3.0",
     description=(
         "AI-augmented business operations platform. "
         "RAG · LangGraph Agents · MCP · OpenClaw · n8n · React Dashboard."
@@ -91,12 +99,19 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
-# Routers
+# Routers — must be included BEFORE the /mcp SSE mount.
+# FastAPI processes include_router() registrations in order; the SSE mount
+# is a Starlette sub-application that catches all paths under /mcp, so
+# routers must be wired first to avoid shadowing /api/mcp/tools.
 # ---------------------------------------------------------------------------
 
 app.include_router(rag_router.router)
 app.include_router(agent_router.router)
-app.include_router(mcp_router.router)
+app.include_router(mcp_router.router)     # registers GET /api/mcp/tools
+
+# Mount MCP SSE transport — Claude Desktop connects to http://localhost:8000/mcp/sse
+# This MUST come after include_router(mcp_router.router) — see note above.
+app.mount("/mcp", mcp.http_app(path="/sse", transport="sse"))
 
 
 # ---------------------------------------------------------------------------
@@ -135,13 +150,13 @@ async def _check_database() -> HealthComponent:
 async def health_check() -> HealthResponse:
     """
     Returns real-time status of all critical components:
-      - database  : SQLite connectivity check
-      - ollama    : HTTP ping to Ollama server
+      - database    : SQLite connectivity check
+      - ollama      : HTTP ping to Ollama server
       - llm_backend : which backend is active (respects PRIVACY_MODE)
     """
-    db_status = await _check_database()
+    db_status     = await _check_database()
     ollama_status = await _check_ollama()
-    llm_status = HealthComponent(
+    llm_status    = HealthComponent(
         status="ok",
         detail=settings.effective_llm_backend,
     )
@@ -155,8 +170,8 @@ async def health_check() -> HealthResponse:
     return HealthResponse(
         status=overall,
         components={
-            "database": db_status,
-            "ollama": ollama_status,
+            "database":    db_status,
+            "ollama":      ollama_status,
             "llm_backend": llm_status,
         },
     )

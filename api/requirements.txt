@@ -43,3 +43,9 @@ langgraph-checkpoint==4.0.3
 langgraph-checkpoint-sqlite==3.0.3
 langgraph-prebuilt==1.0.13
 langgraph-sdk==0.3.14
+
+# ── Phase 3 — MCP Server ─────────────────────────────────────────────────────
+fastmcp==3.2.4
+# fastmcp pulls in these automatically, pinned here for reproducible Docker builds:
+mcp==1.27.1
+sse-starlette==3.4.2

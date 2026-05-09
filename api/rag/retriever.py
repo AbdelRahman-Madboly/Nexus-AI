@@ -59,8 +59,16 @@ COLLECTION_NAME = "nexus_knowledge"
 # ms-marco-MiniLM-L-6-v2 is the standard lightweight reranker for RAG pipelines.
 # ---------------------------------------------------------------------------
 
-_reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
-logger.info("CrossEncoder loaded: cross-encoder/ms-marco-MiniLM-L-6-v2")
+_reranker: Optional[CrossEncoder] = None   # lazy — loaded on first rerank() call
+
+def _get_reranker() -> CrossEncoder:
+    """Return (or create) the CrossEncoder singleton. Loaded on first use, not at import."""
+    global _reranker
+    if _reranker is None:
+        logger.info("Loading CrossEncoder: cross-encoder/ms-marco-MiniLM-L-6-v2")
+        _reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+        logger.info("CrossEncoder ready.")
+    return _reranker
 
 # ---------------------------------------------------------------------------
 # Response model
@@ -303,7 +311,7 @@ def rerank(query: str, candidates: list[dict], top_k: int = 3) -> list[dict]:
         return []
 
     pairs  = [(query, c["text"]) for c in candidates]
-    scores = _reranker.predict(pairs)   # returns ndarray, one score per pair
+    scores = _get_reranker().predict(pairs)   # returns ndarray, one score per pair
 
     # Attach reranker scores and sort
     ranked = sorted(
