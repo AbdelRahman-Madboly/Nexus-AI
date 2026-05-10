@@ -5,7 +5,7 @@
 > Deploy with one command. Switch LLM backends with one env variable. Run entirely on local hardware.
 
 <p align="center">
-  <img src="docs/images/banner.png" alt="Nexus-AI Banner" width="100%"/>
+  <img src="docs/images/banner.jpeg" alt="Nexus-AI Banner" width="100%"/>
 </p>
 
 <p align="center">
@@ -27,7 +27,7 @@ Nexus-AI is a production-quality, fully self-hosted platform that brings AI into
 The platform is designed to be privacy-first: set `PRIVACY_MODE=true` and every LLM call routes to your local Ollama instance — no data leaves your machine.
 
 <p align="center">
-  <img src="docs/images/architecture.png" alt="Nexus-AI Architecture" width="90%"/>
+  <img src="docs/images/architecture.jpeg" alt="Nexus-AI Architecture" width="90%"/>
 </p>
 
 ---
@@ -225,7 +225,7 @@ Full API contract at [`docs/api_contract.md`](docs/api_contract.md).
 Connect Telegram, WhatsApp, or Slack to the Nexus backend without touching the dashboard.
 
 <p align="center">
-  <img src="docs/images/openclaw_flow.png" alt="OpenClaw Message Flow" width="80%"/>
+  <img src="docs/images/openclaw_flow.jpeg" alt="OpenClaw Message Flow" width="80%"/>
 </p>
 
 **Trigger keywords:**
@@ -244,7 +244,7 @@ Setup guide: [`openclaw/README.md`](openclaw/README.md)
 ## Claude Desktop Integration (MCP)
 
 <p align="center">
-  <img src="docs/images/mcp_demo.png" alt="MCP Claude Desktop Demo" width="80%"/>
+  <img src="docs/images/mcp_demo.jpeg" alt="MCP Claude Desktop Demo" width="80%"/>
 </p>
 
 Add this to your Claude Desktop config (`%APPDATA%\Claude\claude_desktop_config.json` on Windows):
