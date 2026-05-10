@@ -9,6 +9,9 @@ __pycache__/
 # Content
 content/
 
+# node_modules
+node_modules/
+
 # Distribution / packaging
 .Python
 build/
@@ -219,3 +222,4 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+"nexus.db" 

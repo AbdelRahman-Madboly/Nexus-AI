@@ -56,6 +56,7 @@
 │   ├── api_contract.md
 │   ├── architecture.md
 │   ├── demo_script.md
+│   ├── mcp_config.json
 │   └── openclaw_setup.md
 ├── n8n
 │   └── workflows
@@ -66,19 +67,25 @@
 ├── openclaw
 │   ├── skills
 │   │   ├── nexus-leads
-│   │   │   └── SKILL.md
+│   │   │   └── skill.js
 │   │   ├── nexus-pipeline
-│   │   │   └── SKILL.md
+│   │   │   └── skill.js
 │   │   └── nexus-rag
-│   │       └── SKILL.md
+│   │       └── skill.js
 │   ├── .env.example
+│   ├── .gitignore
 │   ├── MEMORY.md
 │   ├── README.md
-│   └── SOUL.md
+│   ├── SOUL.md
+│   ├── index.js
+│   ├── package-lock.json
+│   └── package.json
 ├── tests
 │   ├── __init__.py
 │   ├── test_agents.py
 │   ├── test_database.py
+│   ├── test_mcp.py
+│   ├── test_openclaw_skills.js
 │   ├── test_openclaw_skills.py
 │   └── test_rag.py
 ├── .env.example
@@ -87,7 +94,9 @@
 ├── LICENSE
 ├── README.md
 ├── docker-compose.yml
-└── nexus.db
+├── nexus.db
+├── package-lock.json
+└── package.json
 ```
 
 ---

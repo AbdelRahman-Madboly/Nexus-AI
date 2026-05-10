@@ -1,0 +1,28 @@
+{
+  "name": "nexus-ai",
+  "version": "1.0.0",
+  "description": "**AI-Augmented Business Operations Platform** Built to demonstrate production-quality AI engineering — RAG, LangGraph agents, messaging AI, MCP, n8n, and a React dashboard, all running locally with a single command.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AbdelRahman-Madboly/Nexus-AI.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/AbdelRahman-Madboly/Nexus-AI/issues"
+  },
+  "homepage": "https://github.com/AbdelRahman-Madboly/Nexus-AI#readme",
+  "dependencies": {
+    "axios": "^1.16.0"
+  },
+  "type": "module"
+}
