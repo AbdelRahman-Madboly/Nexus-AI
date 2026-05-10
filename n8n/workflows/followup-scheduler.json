@@ -1,1 +1,239 @@
-{"name": "Follow-up Scheduler", "nodes": [], "connections": {}, "active": false, "settings": {}, "notes": "TODO: Build in n8n — daily cron → stale deals SQL → followup API → Gmail"}
+{
+  "name": "Follow-up Scheduler",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "b2c3d4e5-0001-4001-8001-bbccdd000001",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://nexus-api:8000/api/agents/pipeline/report",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "b2c3d4e5-0002-4002-8002-bbccdd000002",
+      "name": "Get Pipeline Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "field-has-stale",
+              "name": "has_stale",
+              "value": "={{ $json.kpis.avg_deal_age > 7 || $json.bottlenecks.length > 0 }}",
+              "type": "boolean"
+            },
+            {
+              "id": "field-bottlenecks",
+              "name": "bottlenecks",
+              "value": "={{ $json.bottlenecks }}",
+              "type": "array"
+            },
+            {
+              "id": "field-digest",
+              "name": "digest",
+              "value": "={{ $json.digest }}",
+              "type": "string"
+            },
+            {
+              "id": "field-run-id",
+              "name": "run_id",
+              "value": "={{ $json.run_id }}",
+              "type": "string"
+            },
+            {
+              "id": "field-avg-age",
+              "name": "avg_deal_age",
+              "value": "={{ $json.kpis.avg_deal_age }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b2c3d4e5-0003-4003-8003-bbccdd000003",
+      "name": "Check for Stale Deals",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-stale",
+              "leftValue": "={{ $json.has_stale }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b2c3d4e5-0004-4004-8004-bbccdd000004",
+      "name": "Stale Deals Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://nexus-api:8000/api/agents/lead/followup",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "deal_id",
+              "value": "stale-deals-sweep"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "b2c3d4e5-0005-4005-8005-bbccdd000005",
+      "name": "Generate Follow-up Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1120, 160]
+    },
+    {
+      "parameters": {
+        "sendTo": "sales@projecx.io",
+        "subject": "=Nexus Follow-up Draft — {{ $now.format('YYYY-MM-DD') }}",
+        "emailType": "html",
+        "message": "=<h2>Daily Follow-up Report — {{ $now.format('YYYY-MM-DD') }}</h2>\n<p><strong>Pipeline Digest:</strong></p>\n<p>{{ $node['Get Pipeline Report'].json['digest'] }}</p>\n<p><strong>Bottlenecks:</strong></p>\n<ul>\n{{ $node['Get Pipeline Report'].json['bottlenecks'].map(b => '<li>' + b + '</li>').join('') }}\n</ul>\n<p><em>Sent automatically by Nexus-AI n8n scheduler.</em></p>",
+        "options": {}
+      },
+      "id": "b2c3d4e5-0006-4006-8006-bbccdd000006",
+      "name": "Send Follow-up Draft",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1340, 160]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "post",
+        "channel": "#sales-ops",
+        "text": "=⏰ *Daily Follow-up Sweep Complete*\nAvg deal age: {{ $node['Check for Stale Deals'].json['avg_deal_age'] }} days\nBottlenecks: {{ $node['Check for Stale Deals'].json['bottlenecks'].length }}\nDraft emailed. Digest: {{ $node['Check for Stale Deals'].json['digest'].substring(0, 200) }}...",
+        "otherOptions": {}
+      },
+      "id": "b2c3d4e5-0007-4007-8007-bbccdd000007",
+      "name": "Notify: Follow-up Sent",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1560, 160]
+    },
+    {
+      "parameters": {},
+      "id": "b2c3d4e5-0008-4008-8008-bbccdd000008",
+      "name": "No Stale Deals",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1120, 440]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          { "node": "Get Pipeline Report", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Get Pipeline Report": {
+      "main": [
+        [
+          { "node": "Check for Stale Deals", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Check for Stale Deals": {
+      "main": [
+        [
+          { "node": "Stale Deals Found?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Stale Deals Found?": {
+      "main": [
+        [
+          { "node": "Generate Follow-up Draft", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "No Stale Deals", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Generate Follow-up Draft": {
+      "main": [
+        [
+          { "node": "Send Follow-up Draft", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Send Follow-up Draft": {
+      "main": [
+        [
+          { "node": "Notify: Follow-up Sent", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

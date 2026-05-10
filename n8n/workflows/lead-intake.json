@@ -1,1 +1,249 @@
-{"name": "Lead Intake", "nodes": [], "connections": {}, "active": false, "settings": {}, "notes": "TODO: Build in n8n — webhook trigger → classify API → Slack + OpenClaw Telegram"}
+{
+  "name": "Lead Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4001-8001-aabbcc000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "nexus-lead-intake"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "field-company",
+              "name": "company",
+              "value": "={{ $json.body.company }}",
+              "type": "string"
+            },
+            {
+              "id": "field-contact-name",
+              "name": "contact_name",
+              "value": "={{ $json.body.contact_name }}",
+              "type": "string"
+            },
+            {
+              "id": "field-contact-email",
+              "name": "contact_email",
+              "value": "={{ $json.body.contact_email || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "field-source",
+              "name": "source",
+              "value": "={{ $json.body.source || 'n8n_webhook' }}",
+              "type": "string"
+            },
+            {
+              "id": "field-message",
+              "name": "message",
+              "value": "={{ $json.body.message }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0002-4002-8002-aabbcc000002",
+      "name": "Extract Lead Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://nexus-api:8000/api/agents/lead/classify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "company",
+              "value": "={{ $node['Extract Lead Fields'].json['company'] }}"
+            },
+            {
+              "name": "contact_name",
+              "value": "={{ $node['Extract Lead Fields'].json['contact_name'] }}"
+            },
+            {
+              "name": "contact_email",
+              "value": "={{ $node['Extract Lead Fields'].json['contact_email'] }}"
+            },
+            {
+              "name": "source",
+              "value": "={{ $node['Extract Lead Fields'].json['source'] }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $node['Extract Lead Fields'].json['message'] }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a1b2c3d4-0003-4003-8003-aabbcc000003",
+      "name": "Classify Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-hot",
+              "leftValue": "={{ $json.stage }}",
+              "rightValue": "hot_lead",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-escalated",
+              "leftValue": "={{ $json.stage }}",
+              "rightValue": "escalated",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0004-4004-8004-aabbcc000004",
+      "name": "Hot Lead or Escalated?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "post",
+        "channel": "#sales-alerts",
+        "text": "=🔥 *New Hot Lead Detected*\nCompany: {{ $node['Extract Lead Fields'].json['company'] }}\nContact: {{ $node['Extract Lead Fields'].json['contact_name'] }}\nStage: {{ $node['Classify Lead'].json['stage'] }}\nScore: {{ $node['Classify Lead'].json['score'] }}/100\nReasoning: {{ $node['Classify Lead'].json['reasoning'] }}\nRun ID: {{ $node['Classify Lead'].json['run_id'] }}",
+        "otherOptions": {}
+      },
+      "id": "a1b2c3d4-0005-4005-8005-aabbcc000005",
+      "name": "Alert: Hot Lead",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1120, 160]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "post",
+        "channel": "#sales-leads",
+        "text": "=🆕 *New Lead Received*\nCompany: {{ $node['Extract Lead Fields'].json['company'] }}\nContact: {{ $node['Extract Lead Fields'].json['contact_name'] }}\nStage: {{ $node['Classify Lead'].json['stage'] }}\nScore: {{ $node['Classify Lead'].json['score'] }}/100",
+        "otherOptions": {}
+      },
+      "id": "a1b2c3d4-0006-4006-8006-aabbcc000006",
+      "name": "Notify: New Lead",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1120, 440]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($node['Classify Lead'].json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a1b2c3d4-0007-4007-8007-aabbcc000007",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          { "node": "Extract Lead Fields", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Extract Lead Fields": {
+      "main": [
+        [
+          { "node": "Classify Lead", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Classify Lead": {
+      "main": [
+        [
+          { "node": "Hot Lead or Escalated?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Hot Lead or Escalated?": {
+      "main": [
+        [
+          { "node": "Alert: Hot Lead", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Notify: New Lead", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Alert: Hot Lead": {
+      "main": [
+        [
+          { "node": "Respond to Webhook", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Notify: New Lead": {
+      "main": [
+        [
+          { "node": "Respond to Webhook", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
