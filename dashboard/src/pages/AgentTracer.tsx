@@ -52,12 +52,51 @@ function nodeIcon(status: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// JSON pretty-printer with simple colour via CSS classes
+// JSON pretty-printer with syntax highlighting
+//
+// FIX: Previous implementation used chained .replace() calls that injected
+// <span> HTML before escaping the JSON text content. This caused the regex
+// for subsequent replacements to match inside the injected class attribute
+// strings (e.g. "text-blue-400") producing leaked CSS in the output.
+//
+// Correct approach:
+//   1. Escape HTML special chars in the raw JSON text FIRST (&, <, >)
+//   2. Then run a single regex pass over the escaped text to wrap tokens
+//      in <span> tags — the escaped content can never interfere with the
+//      injected HTML because it contains no unescaped < > or " chars.
 // ---------------------------------------------------------------------------
+
+function highlight(json: string): string {
+  // Step 1: escape HTML special characters in the JSON text
+  const escaped = json
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Step 2: single-pass token colouring over the now-safe escaped string
+  return escaped.replace(
+    /("(?:\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(?:\s*:)?|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    (match) => {
+      let cls: string;
+      if (match.startsWith('"')) {
+        // Key: ends with colon (possibly with whitespace before it)
+        cls = match.endsWith(':') ? 'text-blue-400' : 'text-emerald-400';
+      } else if (match === 'true' || match === 'false') {
+        cls = 'text-amber-400';
+      } else if (match === 'null') {
+        cls = 'text-gray-500';
+      } else {
+        cls = 'text-orange-400'; // number
+      }
+      return `<span class="${cls}">${match}</span>`;
+    }
+  );
+}
 
 function JsonBlock({ data }: { data: unknown }) {
   const [copied, setCopied] = useState(false);
-  const text = JSON.stringify(data, null, 2);
+  const text        = JSON.stringify(data, null, 2);
+  const highlighted = highlight(text);
 
   function copy() {
     navigator.clipboard.writeText(text).then(() => {
@@ -65,12 +104,6 @@ function JsonBlock({ data }: { data: unknown }) {
       setTimeout(() => setCopied(false), 2000);
     });
   }
-
-  // Syntax colouring: keys in blue, strings in green, numbers in orange
-  const highlighted = text
-    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(?=\s*:))/g, '<span class="text-blue-400">$1</span>')
-    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")(?!\s*:)/g, '<span class="text-emerald-400">$1</span>')
-    .replace(/\b(-?\d+(\.\d+)?)\b/g, '<span class="text-orange-400">$1</span>');
 
   return (
     <div className="relative rounded-xl bg-gray-950 border border-gray-700 overflow-hidden">
@@ -196,6 +229,9 @@ export default function AgentTracer() {
     setError(null);
     inputRef.current?.focus();
   }
+
+  // Suppress unused variable warning — runId used for keying future re-fetches
+  void runId;
 
   // Parse JSON fields safely
   const inputData  = trace?.input_json  ? JSON.parse(trace.input_json)  : null;

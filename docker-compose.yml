@@ -16,8 +16,17 @@ services:
       - CHROMA_PORT=8000
       - OPENCLAW_NEXUS_API_URL=http://nexus-api:8000
       - DATABASE_URL=sqlite:///./nexus.db
+      # Force HuggingFace to use local model cache — no DNS lookups to huggingface.co.
+      # Required because WSL2 DNS cannot reach huggingface.co from inside Docker.
+      # CrossEncoder (cross-encoder/ms-marco-MiniLM-L-6-v2) is already cached at
+      # ~/.cache/huggingface/hub/ and is bind-mounted below.
+      - TRANSFORMERS_OFFLINE=1
+      - HF_DATASETS_OFFLINE=1
     volumes:
       - ./nexus.db:/app/nexus.db
+      # Bind-mount the host HuggingFace cache into the container so the
+      # CrossEncoder model is available without a network download.
+      - ~/.cache/huggingface:/root/.cache/huggingface
     depends_on:
       - nexus-chroma
       - nexus-ollama
@@ -75,12 +84,19 @@ services:
       - nexus-network
 
   nexus-ui:
-    image: node:22-alpine
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
     container_name: nexus-ui
-    working_dir: /app
-    command: sh -c "echo 'Nexus UI placeholder' && tail -f /dev/null"
     ports:
       - "3000:3000"
+    environment:
+      # The dashboard talks to the FastAPI via the Vite proxy in dev.
+      # In production (this Docker build), the React bundle is static and
+      # served by `serve`. All /api calls go to nexus-api via the browser,
+      # so VITE_API_BASE is not needed — the proxy is baked out at build time.
+      # If you ever need SSR or server-side env vars, add them here.
+      - NODE_ENV=production
     depends_on:
       - nexus-api
     restart: unless-stopped
