@@ -1,0 +1,16 @@
+{
+  "name": "nexus-openclaw",
+  "version": "1.0.0",
+  "description": "OpenClaw conversational gateway for Nexus-AI — Telegram, WhatsApp, Slack",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev":   "node --watch index.js"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0",
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0"
+  }
+}
