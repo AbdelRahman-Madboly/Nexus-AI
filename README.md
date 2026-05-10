@@ -1,8 +1,6 @@
 # Nexus-AI
 
-**Self-hosted AI business operations platform — RAG · LangGraph Agents · MCP · Messaging · Automation · Dashboard**
-
-> Deploy with one command. Switch LLM backends with one env variable. Run entirely on local hardware.
+> Self-hosted AI business operations platform — RAG · LangGraph Agents · MCP · Messaging · Automation · Dashboard
 
 <p align="center">
   <img src="docs/images/banner.jpeg" alt="Nexus-AI Banner" width="100%"/>
@@ -12,6 +10,7 @@
   <img src="https://img.shields.io/badge/Python-3.12-blue?logo=python" />
   <img src="https://img.shields.io/badge/FastAPI-0.136-green?logo=fastapi" />
   <img src="https://img.shields.io/badge/LangGraph-1.1-orange" />
+  <img src="https://img.shields.io/badge/ChromaDB-0.6.3-purple" />
   <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react" />
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker" />
   <img src="https://img.shields.io/badge/Tests-35%2F35%20passing-brightgreen" />
@@ -20,55 +19,46 @@
 
 ---
 
-## What Is Nexus-AI
+## What It Does
 
-Nexus-AI is a production-quality, fully self-hosted platform that brings AI into the full lifecycle of a B2B sales pipeline. It combines a RAG knowledge engine, multi-agent CRM automation, a messaging gateway, workflow automation, and a React dashboard — all wired together behind a single FastAPI backend and deployable with `docker-compose up`.
-
-The platform is designed to be privacy-first: set `PRIVACY_MODE=true` and every LLM call routes to your local Ollama instance — no data leaves your machine.
-
-<p align="center">
-  <img src="docs/images/architecture.jpeg" alt="Nexus-AI Architecture" width="90%"/>
-</p>
-
----
-
-## Key Features
-
-| Component | What it does |
-|---|---|
-| **RAG Engine** | Ingest any PDF, DOCX, Markdown, or URL. Query with grounded, cited answers using hybrid semantic + BM25 retrieval and cross-encoder reranking. |
-| **Lead Classifier Agent** | Submit a lead and get a classification (hot / nurture / disqualified / escalated), a 0–100 score, and full reasoning — in under 3 seconds. |
-| **Follow-up Writer Agent** | Give it a deal ID and get a personalized follow-up email grounded in deal history. Self-reviews its own draft and retries if quality is below threshold. |
-| **Pipeline Reporter Agent** | On demand: conversion rate, average deal age, stage distribution, bottleneck analysis, and an LLM-written executive digest. |
-| **MCP Server** | 10 tools exposed via FastMCP + SSE. Claude Desktop can query live SQLite data — "How many hot leads?" answered in real time. |
-| **OpenClaw Gateway** | Send "classify this lead" via Telegram, WhatsApp, or Slack. The agent classifies it and replies — no dashboard needed. |
-| **n8n Automation** | 4 business workflows: lead intake, stale-deal follow-up scheduling, Monday pipeline digest, and alert escalation. |
-| **React Dashboard** | RAG chat with streaming and source citations, LangGraph agent trace visualizer, and pipeline Kanban board. |
+Nexus-AI is a production-quality, fully self-hosted platform that brings AI into the complete lifecycle of a B2B sales pipeline. It combines a RAG knowledge engine that ingests any document and answers with cited sources, three LangGraph agents for lead classification, follow-up generation, and pipeline reporting, an MCP server that lets Claude Desktop query the live database in plain English, and a messaging gateway that routes Telegram, WhatsApp, and Slack conversations to the same AI backend. Everything deploys with a single `docker-compose up -d` and runs on local hardware — your data never leaves the machine.
 
 ---
 
 ## Architecture
 
-```
-FastAPI Gateway (port 8000)
-├── RAG Engine
-│   ├── Document Ingestor  — PDF/MD/DOCX/URL → chunk → embed → ChromaDB
-│   └── Hybrid Retriever   — semantic + BM25 → cross-encoder rerank → LLM → stream
-├── LangGraph Agents (SQLite checkpointer)
-│   ├── Lead Classifier    — 5 nodes, score-based routing
-│   ├── Follow-up Writer   — 5 nodes, self-review loop (max 2 retries, threshold 70)
-│   └── Pipeline Reporter  — 5 nodes, 4 KPI sections, rule-based bottleneck detection
-├── MCP Server (FastMCP)   — 10 tools, SSE transport, Claude Desktop integration
-├── OpenClaw Gateway (port 3456)
-│   ├── Skills: nexus-rag · nexus-leads · nexus-pipeline
-│   └── Channels: Telegram · WhatsApp · Slack
-├── n8n Automation (port 5678)
-│   └── 4 workflows: lead-intake · followup-scheduler · pipeline-digest · alert-escalation
-├── React Dashboard (port 3000)
-│   └── RagChat · AgentTracer · Pipeline Kanban
-└── LLM Router
-    └── openai | claude | gemini | ollama  (PRIVACY_MODE=true → always Ollama)
-```
+<p align="center">
+  <img src="docs/images/architecture.png" alt="Nexus-AI Architecture Diagram" width="100%"/>
+</p>
+
+---
+
+## Features
+
+**🔍 RAG Knowledge Engine**
+Ingest any PDF, DOCX, Markdown file, or URL. Queries use hybrid semantic + BM25 retrieval followed by CrossEncoder reranking, so answers are grounded in your actual documents and cite their sources. The knowledge base is queryable from the dashboard, via Claude Desktop, via any messaging channel, or directly from the API.
+
+**🤖 LangGraph AI Agents**
+Three production agents built with LangGraph StateGraph and a SQLite checkpointer. The Lead Classifier runs 5 reasoning nodes to score leads 0–100 and route them to the correct pipeline stage. The Follow-up Writer generates personalised deal emails and self-reviews its own draft, retrying if quality is below threshold. The Pipeline Reporter computes conversion rates, deal age, stage distribution, and bottleneck detection — then writes an executive digest.
+
+**🔌 MCP + Claude Desktop**
+Ten tools exposed via FastMCP over SSE transport. Connect Claude Desktop and ask "How many hot leads do we have?" or "Draft a follow-up for deal [id]" — Claude calls the live SQLite database and LangGraph agents in real time. Any MCP-compatible AI assistant can query the business without writing SQL.
+
+**⚡ Multi-Channel Automation**
+The same AI backend responds across Telegram, WhatsApp, Slack, and n8n webhooks. OpenClaw gateway uses keyword-based intent routing (zero LLM cost) to dispatch each message to the right skill. Four n8n workflows handle lead intake, stale-deal follow-up scheduling, Monday pipeline digests, and critical alert escalation — all on cron or webhook triggers.
+
+---
+
+## Tech Stack
+
+| Backend | Frontend & Automation |
+|---|---|
+| Python 3.12 · FastAPI · Pydantic v2 | React 18 · Vite 5 · TypeScript · TailwindCSS |
+| LangGraph 1.x · LangChain 1.x | Node.js 22 (OpenClaw gateway) |
+| ChromaDB 0.6.3 · BM25 · CrossEncoder | n8n (4 automation workflows) |
+| Ollama · OpenAI · Claude · Gemini | Telegram Bot API · Twilio WhatsApp · Slack Bolt |
+| SQLite (WAL · aiosqlite) | FastMCP · SSE transport |
+| Docker Compose (6 services) | Vite proxy → FastAPI |
 
 ---
 
@@ -76,168 +66,71 @@ FastAPI Gateway (port 8000)
 
 ### Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
-- [Ollama](https://ollama.com) running locally (required for embeddings)
-- At least one of: OpenAI API key / Anthropic API key / Gemini API key — or use Ollama only
+- WSL2 with Docker and `docker-compose` installed
+- Ollama running on Windows host (`set OLLAMA_HOST=0.0.0.0 && ollama serve`)
+  - Pull required models: `ollama pull nomic-embed-text` and `ollama pull gemma3:4b`
+- At least one LLM API key (Gemini / Anthropic / OpenAI) — or use Ollama only for full privacy
 
-### 1. Clone and configure
+### Setup
 
 ```bash
 git clone https://github.com/AbdelRahman-Madboly/Nexus-AI.git
 cd Nexus-AI
 cp .env.example .env
-# Edit .env — add your API keys and Ollama URL
-```
 
-### 2. Pull Ollama models
+# Edit .env — set OLLAMA_BASE_URL to your Windows host IP, add API key(s)
+# Get host IP: ip route | grep default | awk '{print $3}'
 
-```bash
-ollama pull nomic-embed-text   # required — used for all embeddings
-ollama pull gemma3:4b          # or any chat model you prefer
-```
-
-### 3. Start everything
-
-```bash
 docker-compose up -d
-```
+# First start takes 60-90s — ChromaDB initialises, CrossEncoder model loads from cache
 
-### 4. Verify
-
-```bash
 curl http://localhost:8000/api/health
-# → {"status":"ok","components":{"database":{"status":"ok"},"ollama":{"status":"ok"},...}}
+# → {"status":"ok","components":{"database":{"status":"ok"},...}}
 ```
 
-### 5. Ingest a document and ask a question
+### Ingest a document and ask a question
 
 ```bash
 # Ingest a URL
 curl -X POST http://localhost:8000/api/rag/ingest \
-     -H "Content-Type: application/json" \
-     -d '{"source": "https://example.com/your-docs"}'
+  -H "Content-Type: application/json" \
+  -d '{"source": "https://your-docs-url.com"}'
 
 # Ask a question
 curl -X POST http://localhost:8000/api/rag/query \
-     -H "Content-Type: application/json" \
-     -d '{"query": "What does this product do?", "stream": false}'
+  -H "Content-Type: application/json" \
+  -d '{"query": "What does this product do?", "top_k": 3}'
 ```
 
-### 6. Open the dashboard
+### Services
 
-```
-http://localhost:3000
-```
-
-API docs (Swagger UI) at `http://localhost:8000/api/docs`
-
----
-
-## Services
-
-| Service | Port | Description |
+| Service | URL | Purpose |
 |---|---|---|
-| `nexus-api` | 8000 | FastAPI backend — all AI logic |
-| `nexus-chroma` | 8001 | ChromaDB vector store |
-| `nexus-ollama` | 11434 | Local Ollama LLM server |
-| `nexus-n8n` | 5678 | n8n workflow automation |
-| `nexus-ui` | 3000 | React dashboard |
-| `nexus-openclaw` | 3456 | OpenClaw messaging gateway |
-
-All 6 services start with a single `docker-compose up -d`.
+| Dashboard | http://localhost:3000 | React UI — RagChat, AgentTracer, Pipeline |
+| FastAPI | http://localhost:8000 | AI backend — all agent and RAG logic |
+| API Docs | http://localhost:8000/api/docs | Swagger UI |
+| n8n | http://localhost:5678 | Workflow automation |
+| ChromaDB | http://localhost:8001 | Vector store |
+| OpenClaw | http://localhost:3456 | Messaging gateway |
 
 ---
 
 ## LLM Configuration
 
-Switch backends with a single `.env` change — zero code changes required.
+Switch backends with a single `.env` change — no code changes required.
 
 ```bash
-# Gemini (default)
-LLM_BACKEND=gemini
+LLM_BACKEND=gemini          # gemini | claude | openai | ollama
+PRIVACY_MODE=false           # true → all calls go to Ollama, no exceptions
+
 GEMINI_API_KEY=your-key
-
-# Claude
-LLM_BACKEND=claude
 ANTHROPIC_API_KEY=sk-ant-...
-
-# OpenAI
-LLM_BACKEND=openai
 OPENAI_API_KEY=sk-...
-
-# Local Ollama only — fully private
-LLM_BACKEND=ollama
-PRIVACY_MODE=true    # forces ALL calls to Ollama regardless of LLM_BACKEND
+OLLAMA_BASE_URL=http://172.29.208.1:11434   # Windows host IP (check after reboot)
+OLLAMA_MODEL=gemma3:4b
 ```
 
-> Embeddings **always** use Ollama (`nomic-embed-text`) regardless of the LLM backend.
-> This keeps ChromaDB vectors consistent across ingest and query sessions.
-
----
-
-## API Reference
-
-### Health
-```http
-GET /api/health
-```
-
-### RAG
-```http
-POST /api/rag/ingest
-{"source": "https://your-url.com", "doc_type": "url"}
-
-POST /api/rag/query
-{"query": "Your question here", "top_k": 3, "stream": false}
-```
-
-### Agents
-```http
-POST /api/agents/lead/classify
-{
-  "company": "Acme Corp",
-  "contact_name": "Jane Smith",
-  "contact_email": "jane@acme.com",
-  "source": "LinkedIn",
-  "message": "We're evaluating AI CRM tools for our 50-person sales team."
-}
-
-POST /api/agents/lead/followup
-{"deal_id": "your-deal-uuid"}
-
-GET /api/agents/pipeline/report
-
-GET /api/agents/trace/{run_id}
-```
-
-### MCP
-```http
-GET /api/mcp/tools       # list all 10 tools
-# SSE transport at: /mcp/sse  (for Claude Desktop)
-```
-
-Full API contract at [`docs/api_contract.md`](docs/api_contract.md).
-
----
-
-## Messaging Gateway (OpenClaw)
-
-Connect Telegram, WhatsApp, or Slack to the Nexus backend without touching the dashboard.
-
-<p align="center">
-  <img src="docs/images/openclaw_flow.jpeg" alt="OpenClaw Message Flow" width="80%"/>
-</p>
-
-**Trigger keywords:**
-
-| Message | Routed to |
-|---|---|
-| "what is...", "tell me about...", anything unknown | RAG knowledge base |
-| "classify lead...", "new lead from..." | Lead Classifier Agent |
-| "followup for deal [uuid]" | Follow-up Writer Agent |
-| "pipeline report", "kpis", "conversion" | Pipeline Reporter Agent |
-
-Setup guide: [`openclaw/README.md`](openclaw/README.md)
+Embeddings always use Ollama `nomic-embed-text` regardless of LLM backend — this keeps ChromaDB vectors consistent across ingest and query sessions.
 
 ---
 
@@ -247,7 +140,7 @@ Setup guide: [`openclaw/README.md`](openclaw/README.md)
   <img src="docs/images/mcp_demo.jpeg" alt="MCP Claude Desktop Demo" width="80%"/>
 </p>
 
-Add this to your Claude Desktop config (`%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+Add to your Claude Desktop config (`%APPDATA%\Claude\claude_desktop_config.json` on Windows):
 
 ```json
 {
@@ -261,54 +154,41 @@ Add this to your Claude Desktop config (`%APPDATA%\Claude\claude_desktop_config.
 }
 ```
 
-Then ask Claude: *"How many hot leads do we have?"* or *"Draft a follow-up for deal [id]"*
+Then ask Claude: "How many hot leads do we have?" or "Generate a pipeline KPI report."
 
-10 tools available: query leads, query deals, get deal history, update deal stage, search knowledge, ingest document, draft email, schedule follow-up, pipeline KPIs, agent runs.
+10 tools available: `nexus_query_leads` · `nexus_query_deals` · `nexus_get_deal_history` · `nexus_update_deal_stage` · `nexus_search_knowledge` · `nexus_ingest_document` · `nexus_draft_email` · `nexus_schedule_followup` · `nexus_pipeline_kpis` · `nexus_agent_runs`
+
+---
+
+## Messaging Gateway (OpenClaw)
+
+<p align="center">
+  <img src="docs/images/openclaw_flow.jpeg" alt="OpenClaw Message Flow" width="80%"/>
+</p>
+
+Connect Telegram, WhatsApp, or Slack without touching the dashboard.
+
+| Message | Routed to |
+|---|---|
+| "what is...", "tell me about...", anything unknown | RAG knowledge base |
+| "classify lead...", "new lead from..." | Lead Classifier Agent |
+| "followup for deal [uuid]" | Follow-up Writer Agent |
+| "pipeline report", "kpis", "conversion" | Pipeline Reporter Agent |
 
 ---
 
 ## n8n Automation Workflows
 
-4 ready-to-import workflow JSON files in [`n8n/workflows/`](n8n/workflows/):
+Four ready-to-import workflow JSON files in `n8n/workflows/`:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `lead-intake.json` | Webhook | Classifies incoming lead → Slack + Telegram notification |
-| `followup-scheduler.json` | Daily cron | Finds stale deals → drafts follow-up → Gmail |
-| `pipeline-digest.json` | Monday 8AM | Pipeline report → email + Slack |
+| `lead-intake.json` | Webhook | Classifies incoming lead → Slack notification |
+| `followup-scheduler.json` | Daily 9 AM | Finds stale deals → drafts follow-up → Gmail |
+| `pipeline-digest.json` | Monday 8 AM | Pipeline report → email + Slack |
 | `alert-escalation.json` | Webhook | WhatsApp + Slack alert → 4h wait → escalate |
 
 Import via n8n UI at `http://localhost:5678`.
-
----
-
-## Database Schema
-
-SQLite (WAL mode, async via aiosqlite). Four tables:
-
-```sql
-leads       — id, company, contact_name, contact_email, source, stage, score, timestamps
-deals       — id, lead_id (FK), stage, value, owner, last_contact, timestamps
-agent_runs  — id, agent_name, run_id, input_json, output_json, status, timestamps
-rag_queries — id, query_text, response_text, sources_json, latency_ms, model_used, created_at
-```
-
-Lead stages: `new_lead` · `hot_lead` (≥80) · `nurture` (50–79) · `proposal` · `closed_won` · `closed_lost` · `disqualified` (<50) · `escalated`
-
----
-
-## Engineering Principles
-
-Every file in the project follows these rules without exception:
-
-1. **LLM routing** — all LLM calls go through `api/llm/llm_router.py`. No SDK imports in feature code.
-2. **Privacy mode** — `PRIVACY_MODE=true` routes everything to Ollama at the config layer.
-3. **Config** — all settings from `api/config.py` (pydantic-settings). Zero hardcoded values.
-4. **Database** — SQLite only, WAL mode, async via aiosqlite.
-5. **Agents** — all agents use LangGraph `StateGraph` + `SqliteSaver`. Every run logged to `agent_runs`.
-6. **API models** — every endpoint has a Pydantic v2 request and response model. No `dict` or `Any`.
-7. **Async** — `async/await` throughout for all I/O.
-8. **No vendor lock-in** — switch LLM backend via single `.env` change. Zero code changes.
 
 ---
 
@@ -317,42 +197,46 @@ Every file in the project follows these rules without exception:
 ```
 Nexus-AI/
 ├── api/
-│   ├── config.py           # pydantic-settings singleton, PRIVACY_MODE enforcement
-│   ├── database.py         # SQLite WAL, 4 tables, get_db() context manager
-│   ├── main.py             # FastAPI app, lifespan, health endpoint, MCP mount
-│   ├── llm/                # LLM router + OpenAI / Claude / Gemini / Ollama clients
-│   ├── rag/                # Document ingestor + hybrid retriever
-│   ├── agents/             # 3 LangGraph agents + shared graph utilities
-│   ├── mcp/                # FastMCP server, 10 tools, SSE transport
-│   └── routers/            # rag_router · agent_router · mcp_router
+│   ├── config.py           — pydantic-settings singleton, PRIVACY_MODE enforcement
+│   ├── database.py         — SQLite WAL, 4 tables
+│   ├── main.py             — FastAPI app, lifespan, MCP mount
+│   ├── llm/                — LLM router + 4 backend clients
+│   ├── rag/                — Document ingestor + hybrid retriever
+│   ├── agents/             — 3 LangGraph agents + shared utilities
+│   ├── mcp/                — FastMCP server, 10 tools, SSE transport
+│   └── routers/            — rag_router · agent_router · mcp_router
 ├── openclaw/
-│   ├── index.js            # Gateway entry: Telegram + WhatsApp + Slack + intent router
-│   ├── skills/             # nexus-rag · nexus-leads · nexus-pipeline
-│   ├── SOUL.md             # Assistant persona definition
-│   └── MEMORY.md           # Company context seed
-├── n8n/workflows/          # 4 n8n workflow JSON files (import via UI)
-├── dashboard/              # React 18 + Vite + TypeScript + TailwindCSS
-├── tests/                  # 35 tests — database · RAG · agents · MCP · integration
-├── docs/                   # Architecture · API contract · demo script
-└── docker-compose.yml      # 6 services, single-command deploy
+│   ├── index.js            — Gateway: Telegram + WhatsApp + Slack + intent router
+│   └── skills/             — nexus-rag · nexus-leads · nexus-pipeline
+├── n8n/workflows/          — 4 n8n workflow JSON files
+├── dashboard/              — React 18 + Vite + TypeScript + TailwindCSS
+├── tests/                  — 35 tests across 5 suites
+├── docs/                   — architecture · api_contract · demo_script
+└── docker-compose.yml      — 6 services, single-command deploy
 ```
 
 ---
 
-## Tech Stack
+## Configuration Reference
 
-| Layer | Technology |
-|---|---|
-| API | FastAPI · Python 3.12 · Pydantic v2 · uvicorn |
-| Agents | LangGraph 1.x · LangChain 1.x · SQLite checkpointer |
-| RAG | ChromaDB · Ollama embeddings · BM25 · CrossEncoder reranking |
-| LLM | Ollama · OpenAI · Anthropic Claude · Google Gemini |
-| Messaging | Node.js · Telegram Bot API · Twilio (WhatsApp) · Slack Bolt SDK |
-| MCP | FastMCP · SSE transport |
-| Automation | n8n |
-| Frontend | React 18 · Vite · TypeScript · TailwindCSS |
-| Database | SQLite (WAL mode · aiosqlite) |
-| Infrastructure | Docker Compose · 6 services |
+| Variable | Description | Example |
+|---|---|---|
+| `LLM_BACKEND` | Active LLM provider | `gemini` |
+| `PRIVACY_MODE` | Route all calls to Ollama | `false` |
+| `OLLAMA_BASE_URL` | Windows host Ollama URL (changes on reboot) | `http://172.29.208.1:11434` |
+| `OLLAMA_MODEL` | Chat model for Ollama backend | `gemma3:4b` |
+| `OLLAMA_EMBED_MODEL` | Embedding model (always Ollama) | `nomic-embed-text` |
+| `GEMINI_API_KEY` | Google Gemini API key | `AIza...` |
+| `ANTHROPIC_API_KEY` | Anthropic Claude API key | `sk-ant-...` |
+| `OPENAI_API_KEY` | OpenAI API key | `sk-...` |
+| `CHROMA_HOST` | ChromaDB hostname (Docker internal) | `nexus-chroma` |
+| `CHROMA_PORT` | ChromaDB port (Docker internal) | `8000` |
+| `DATABASE_URL` | SQLite path | `sqlite:///./nexus.db` |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token | `8718...` |
+| `SLACK_BOT_TOKEN` | Slack bot OAuth token | `xoxb-...` |
+| `SLACK_APP_TOKEN` | Slack Socket Mode token | `xapp-...` |
+| `TWILIO_ACCOUNT_SID` | Twilio account SID | `AC...` |
+| `TWILIO_AUTH_TOKEN` | Twilio auth token | `...` |
 
 ---
 
@@ -379,20 +263,27 @@ All agent and MCP tests are fully mocked — no Ollama, Gemini, or ChromaDB requ
 | Symptom | Fix |
 |---|---|
 | `docker compose` not found | Use `docker-compose` (hyphen) |
-| Ollama unreachable from container | Check `OLLAMA_BASE_URL` in `.env` — WSL2 gateway IP changes on reboot |
-| Uvicorn hangs 3–5 min on first start | CrossEncoder model (~90MB) downloading. Wait once — cached forever after. |
+| Ollama unreachable from container | Check `OLLAMA_BASE_URL` — WSL2 gateway IP changes on reboot |
+| Uvicorn hangs 3–5 min on first start | CrossEncoder model (~90MB) downloading. Wait once — cached forever after |
 | ChromaDB `KeyError: '_type'` | Do not pass `metadata=` to `get_or_create_collection()` |
-| Gemini 429 on test suite | Free tier = 5 req/min. Set `LLM_BACKEND=ollama` for bulk testing. |
-| `langchain-core` version conflict | Upgrade full langchain stack to 1.x (see `api/requirements.txt`) |
-| `GraphRecursionError` in agent | Increment state counters inside node return dicts, not inside edge functions |
+| Gemini 429 on test suite | Free tier = 5 req/min. Set `LLM_BACKEND=ollama` for bulk testing |
+| `GraphRecursionError` in agent | Increment state counters inside node return dicts, not edge functions |
 | Telegram `409 Conflict` | Two bot instances running — `pkill -f "node index.js"` then restart |
 | RAG returns empty answer | No documents ingested yet — run `POST /api/rag/ingest` first |
+| n8n webhook 404 | Workflow not activated — toggle the Activate switch in n8n UI |
+| Claude Desktop no tools | Fully quit and relaunch Claude Desktop after config change |
 
 ---
 
-## License
+## Contributing
 
-MIT — see [LICENSE](LICENSE)
+This project is a portfolio demonstration. Issues and PRs are welcome.
+
+---
+
+## Licence
+
+MIT — Copyright 2026 Abdel Rahman M. El-Saied
 
 ---
 
