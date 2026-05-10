@@ -8,7 +8,7 @@ starlette==1.0.0
 pydantic==2.13.4
 pydantic-settings==2.14.1
 pydantic-core==2.46.4
-python-dotenv==1.0.1
+python-dotenv==1.1.0
 
 # ── Database ─────────────────────────────────────────────────────────────────
 aiosqlite==0.22.1
