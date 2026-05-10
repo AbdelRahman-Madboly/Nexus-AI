@@ -1,1 +1,273 @@
-{"name": "Alert Escalation", "nodes": [], "connections": {}, "active": false, "settings": {}, "notes": "TODO: Build in n8n — webhook → WhatsApp (Twilio) + Slack → 4hr wait → escalate"}
+{
+  "name": "Alert Escalation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alert-escalation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "d4e5f6a7-0001-4001-8001-ddeeff000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "nexus-alert-escalation"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "field-deal-id",
+              "name": "deal_id",
+              "value": "={{ $json.body.deal_id }}",
+              "type": "string"
+            },
+            {
+              "id": "field-company",
+              "name": "company",
+              "value": "={{ $json.body.company }}",
+              "type": "string"
+            },
+            {
+              "id": "field-contact-name",
+              "name": "contact_name",
+              "value": "={{ $json.body.contact_name }}",
+              "type": "string"
+            },
+            {
+              "id": "field-escalation-level",
+              "name": "escalation_level",
+              "value": "={{ $json.body.escalation_level || 'standard' }}",
+              "type": "string"
+            },
+            {
+              "id": "field-reason",
+              "name": "reason",
+              "value": "={{ $json.body.reason }}",
+              "type": "string"
+            },
+            {
+              "id": "field-assigned-to",
+              "name": "assigned_to",
+              "value": "={{ $json.body.assigned_to || 'Unassigned' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4e5f6a7-0002-4002-8002-ddeeff000002",
+      "name": "Extract Alert Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://nexus-openclaw:3456/webhook/whatsapp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "Body",
+              "value": "=⚠️ ALERT: {{ $node['Extract Alert Fields'].json['company'] }} deal escalated. Reason: {{ $node['Extract Alert Fields'].json['reason'] }}. Deal ID: {{ $node['Extract Alert Fields'].json['deal_id'] }}"
+            },
+            {
+              "name": "From",
+              "value": "whatsapp:+15005550006"
+            },
+            {
+              "name": "To",
+              "value": "=whatsapp:{{ $env.TWILIO_PHONE_NUMBER }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "d4e5f6a7-0003-4003-8003-ddeeff000003",
+      "name": "WhatsApp Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 160]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "post",
+        "channel": "#sales-alerts",
+        "text": "=⚠️ *Deal Escalated — Immediate Attention Required*\nCompany: {{ $node['Extract Alert Fields'].json['company'] }}\nContact: {{ $node['Extract Alert Fields'].json['contact_name'] }}\nDeal ID: {{ $node['Extract Alert Fields'].json['deal_id'] }}\nReason: {{ $node['Extract Alert Fields'].json['reason'] }}\nLevel: {{ $node['Extract Alert Fields'].json['escalation_level'] }}\nAssigned: {{ $node['Extract Alert Fields'].json['assigned_to'] }}\n\n_WhatsApp alert sent. Escalation review in 4 hours if unresolved._",
+        "otherOptions": {}
+      },
+      "id": "d4e5f6a7-0004-4004-8004-ddeeff000004",
+      "name": "Immediate Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [680, 440]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"acknowledged\": true, \"deal_id\": \"{{ $node['Extract Alert Fields'].json['deal_id'] }}\", \"escalation_review_in\": \"4 hours\" }",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "d4e5f6a7-0005-4005-8005-ddeeff000005",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "hours"
+      },
+      "id": "d4e5f6a7-0006-4006-8006-ddeeff000006",
+      "name": "Wait 4 Hours",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-critical",
+              "leftValue": "={{ $node['Extract Alert Fields'].json['escalation_level'] }}",
+              "rightValue": "critical",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4e5f6a7-0007-4007-8007-ddeeff000007",
+      "name": "Critical Escalation?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "post",
+        "channel": "#sales-alerts",
+        "text": "=🚨 *ESCALATION UNRESOLVED — 4 HOURS*\nDeal: {{ $node['Extract Alert Fields'].json['deal_id'] }}\nCompany: {{ $node['Extract Alert Fields'].json['company'] }}\nThis escalation has not been resolved in 4 hours.\n@channel — immediate action required.",
+        "otherOptions": {}
+      },
+      "id": "d4e5f6a7-0008-4008-8008-ddeeff000008",
+      "name": "Escalation: Critical",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1560, 160]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "post",
+        "channel": "#sales-team",
+        "text": "=🔔 *Escalation Reminder (4hr)*\nDeal: {{ $node['Extract Alert Fields'].json['deal_id'] }}\nCompany: {{ $node['Extract Alert Fields'].json['company'] }}\nStill open after 4 hours. Please review.",
+        "otherOptions": {}
+      },
+      "id": "d4e5f6a7-0009-4009-8009-ddeeff000009",
+      "name": "Escalation: Reminder",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1560, 440]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          { "node": "Extract Alert Fields", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Extract Alert Fields": {
+      "main": [
+        [
+          { "node": "WhatsApp Alert", "type": "main", "index": 0 },
+          { "node": "Immediate Alert", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "WhatsApp Alert": {
+      "main": [
+        [
+          { "node": "Respond to Webhook", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Immediate Alert": {
+      "main": [
+        [
+          { "node": "Respond to Webhook", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          { "node": "Wait 4 Hours", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wait 4 Hours": {
+      "main": [
+        [
+          { "node": "Critical Escalation?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Critical Escalation?": {
+      "main": [
+        [
+          { "node": "Escalation: Critical", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Escalation: Reminder", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
